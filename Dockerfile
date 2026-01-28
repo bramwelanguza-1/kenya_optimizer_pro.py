@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 8501
 
 # Command to run the app
-ENTRYPOINT ["streamlit", "run", "kenya_optimizer_pro.py", "--server.port=8501", "--server.address=0.0.0.0"]
+ENTRYPOINT ["sh", "-c", "streamlit run kenya_optimizer_pro.py --server.port=$PORT --server.address=0.0.0.0"]
