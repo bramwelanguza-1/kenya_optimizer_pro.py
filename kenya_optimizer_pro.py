@@ -72,20 +72,33 @@ load_vals = [random.randint(40, 95) for _ in cities]
 df = pd.DataFrame({"City": cities, "Load %": load_vals})
 
 with col1:
-    # ... your map initialization ...
+    st.subheader("Live Traffic Heatmap")
+    
+    # 1. DEFINE the map object first (this defines 'm')
+    m = folium.Map(
+        location=[-1.286389, 36.817223], 
+        zoom_start=6, 
+        tiles="CartoDB dark_matter"
+    )
+    
+    # 2. NOW you can loop and add to 'm'
     for city, coords in {"Nairobi (KIXP)": [-1.28, 36.8], "Mombasa (KIXP)": [-4.04, 39.6], "Kisumu (KIXP)": [-0.1, 34.7]}.items():
         
-        # Pull the load value and force it to a float immediately
+        # Get the load and fix the float type error we saw earlier
         current_load = float(df[df["City"] == city]["Load %"].values[0])
         
         color = "red" if current_load > 80 else "cyan"
+        
+        # This line was failing because 'm' didn't exist yet or was defined after this
         folium.Circle(
             location=coords, 
-            radius=current_load * 500, # This now uses a standard float
+            radius=current_load * 500, 
             color=color, 
             fill=True, 
             popup=f"{city}: {current_load}% Load"
-        ).add_to(m)
+        ).add_to(m) 
+    
+    # 3. Finally, display the map
     st_folium(m, height=500, width=900)
 
 with col2:
