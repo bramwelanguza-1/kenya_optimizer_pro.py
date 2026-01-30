@@ -72,14 +72,19 @@ load_vals = [random.randint(40, 95) for _ in cities]
 df = pd.DataFrame({"City": cities, "Load %": load_vals})
 
 with col1:
-    # Interactive Map with Glow Effect
-    m = folium.Map(location=[-1.286, 36.817], zoom_start=6, tiles="CartoDB dark_matter")
+    # ... your map initialization ...
     for city, coords in {"Nairobi (KIXP)": [-1.28, 36.8], "Mombasa (KIXP)": [-4.04, 39.6], "Kisumu (KIXP)": [-0.1, 34.7]}.items():
-        load = df[df["City"] == city]["Load %"].values[0]
-        color = "red" if load > 80 else "cyan"
+        
+        # Pull the load value and force it to a float immediately
+        current_load = float(df[df["City"] == city]["Load %"].values[0])
+        
+        color = "red" if current_load > 80 else "cyan"
         folium.Circle(
-            location=coords, radius=load * 500, color=color, fill=True, 
-            popup=f"{city}: {load}% Load"
+            location=coords, 
+            radius=current_load * 500, # This now uses a standard float
+            color=color, 
+            fill=True, 
+            popup=f"{city}: {current_load}% Load"
         ).add_to(m)
     st_folium(m, height=500, width=900)
 
@@ -89,18 +94,30 @@ with col2:
     
     if opt_active:
         st.success("🤖 AI Handshake Complete.")
-        # Re-calculating with AI Optimization formula: Load = Load * 0.7
+        
+        # --- INPUT THE FIX HERE ---
         df["Load %"] = df["Load %"] * 0.7
+        df["Load %"] = df["Load %"].astype(float) # This is the critical fix
+        # ---------------------------
+        
         st.info("Optimization: Packet-level prioritization active (M-Pesa/Gov Traffic First)")
     
+    # This chart also needs clean float data to render without errors
     fig = px.bar(df, x="City", y="Load %", range_y=[0, 100], color="Load %",
                  color_continuous_scale=["#00ff00", "#ffff00", "#ff0000"])
-    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
+    
+    # Transparent Glassmorphism styling for the chart
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', 
+        plot_bgcolor='rgba(0,0,0,0)', 
+        font_color="white"
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 st.divider()
 st.markdown("#### Floating Core Logic (Shannon Limit Check):")
 st.latex(r"C = W \log_2 \left( 1 + \frac{S}{N} \right)")
+
 
 # Auto-Refresh
 time.sleep(2)
