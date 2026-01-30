@@ -5,27 +5,22 @@ from streamlit_folium import folium_static
 import math
 import random
 
-# --- 1. DEFINE FUNCTIONS FIRST (Prevents NameError) ---
 
+
+# 1. Function Definitions (Must be BEFORE they are used)
 def calculate_detailed_metrics(bandwidth_mhz, load_percent):
-    """Decomposes Shannon physics based on current load."""
     B = bandwidth_mhz * 1e6 
-    # Logic: More load = more internal interference (Noise floor rises)
     base_snr_db = 30 
     snr_db = base_snr_db - (load_percent / 5) 
     snr_linear = 10**(snr_db / 10)
-    
     capacity_bps = B * math.log2(1 + snr_linear)
     spectral_efficiency = capacity_bps / B
     return snr_db, capacity_bps / 1e6, spectral_efficiency
 
 def get_shannon_deep_dive(B_mhz, S_watts, N_watts):
-    """The Expanded Shannon-Hartley Principle."""
     B = B_mhz * 1e6
     SNR_linear = S_watts / N_watts
     C = B * math.log2(1 + SNR_linear)
-    # Eb/No: Energy per bit over noise power spectral density
-    # A 'hidden truth' of engineering efficiency
     eb_no = SNR_linear * (B / C)
     return C / 1e6, math.log2(1 + SNR_linear), eb_no
 
