@@ -72,6 +72,21 @@ load_vals = [random.randint(40, 95) for _ in cities]
 df = pd.DataFrame({"City": cities, "Load %": load_vals})
 
 with col1:
+    # --- NEW: AI CALCULATION PROGRESS BAR ---
+    progress_text = "🤖 AI Engine: Analyzing KIXP Traffic Loads..."
+    my_bar = st.progress(0, text=progress_text)
+
+    for percent_complete in range(100):
+        time.sleep(0.01)  # Simulates 1 second of high-speed computation
+        my_bar.progress(percent_complete + 1, text=progress_text)
+    
+    # After completion, hide the bar and show a success message
+    my_bar.empty()
+    st.success("Analysis Complete: Optimization routes identified.")
+    # ----------------------------------------
+
+    st.subheader("Live Traffic Heatmap")
+    # ... rest of your map code follows ...
     st.subheader("Live Traffic Heatmap")
     
     # 1. DEFINE the map object first (this defines 'm')
@@ -99,7 +114,7 @@ with col1:
         ).add_to(m) 
     
     # 3. Finally, display the map
-    st_folium(m, height=500, width=900)
+    folium_static(m, height=500, width=900)
 
 with col2:
     st.subheader("AI Controller")
