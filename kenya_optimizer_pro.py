@@ -115,6 +115,53 @@ with col1:
     
     # 3. Finally, display the map
     folium_static(m, height=500, width=900)
+    # --- 2. UI IMPLEMENTATION (Put this after your map code) ---
+
+st.divider()
+st.subheader("🧬 The Physics of the Link: Shannon-Hartley Decomposition")
+
+# User can tweak physical layer variables
+with st.expander("Adjust Physical Layer Constants (Simulated)"):
+    base_b = st.slider("Channel Bandwidth (MHz)", 10, 100, 20)
+    st.write("Current Formula: $C = B \log_2(1 + \frac{S}{N})$")
+
+col_phys1, col_phys2, col_phys3 = st.columns(3)
+
+# Calculate metrics for the highest-load city
+target_city = df.iloc[df['Load %'].idxmax()]
+snr, cap, eff = calculate_detailed_metrics(base_b, target_city['Load %'])
+
+with col_phys1:
+    st.metric("Signal-to-Noise Ratio (SNR)", f"{round(snr, 2)} dB")
+    st.caption("Lower SNR = Higher Interference")
+
+with col_phys2:
+    st.metric("Theoretical Capacity", f"{round(cap, 2)} Mbps")
+    st.caption(f"Max throughput for {target_city['City']}")
+
+with col_phys3:
+    st.metric("Spectral Efficiency", f"{round(eff, 2)} bit/s/Hz")
+    st.caption("How 'dense' the data is packed")
+    # Add this inside your map creation loop
+if st.session_state.fiber_cut:
+    folium.PolyLine(
+        locations=reroute_path,
+        color="yellow",
+        weight=5,
+        dash_array='10',
+        tooltip="AI Reroute: Terrestrial Backhaul (NOFBI)"
+    ).add_to(m)
+
+# --- 3. THE HIDDEN TRUTH: LATENCY VS JITTER ---
+st.markdown("### 📉 Network Health: Beyond Bandwidth")
+# Generate jitter data based on congestion
+jitter = [random.uniform(1, 5) + (l/20) for l in df['Load %']]
+health_df = pd.DataFrame({"City": df['City'], "Jitter (ms)": jitter})
+
+fig_health = px.line(health_df, x="City", y="Jitter (ms)", markers=True, 
+                    title="Jitter Analysis: Stability of the Data Stream")
+fig_health.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
+st.plotly_chart(fig_health, use_container_width=True)
 
 with col2:
     st.subheader("AI Controller")
@@ -145,6 +192,74 @@ with col2:
 st.divider()
 st.markdown("#### Floating Core Logic (Shannon Limit Check):")
 st.latex(r"C = W \log_2 \left( 1 + \frac{S}{N} \right)")
+# --- 1. ADVANCED SIGNAL METRICS FUNCTION ---
+def calculate_detailed_metrics(bandwidth_mhz, load_percent):
+    """
+    Simulates the physics of the link based on load.
+    High load often increases interference (Noise).
+    """
+    B = bandwidth_mhz * 1e6  # Convert MHz to Hz
+    
+    # As load increases, Signal-to-Noise Ratio (SNR) typically drops
+    # because more users create more interference.
+    base_snr_db = 30 
+    noise_interference = (load_percent / 10) # Simple linear noise model
+    snr_db = base_snr_db - noise_interference
+    
+    # Linear SNR
+    snr_linear = 10**(snr_db / 10)
+    
+    # Shannon-Hartley Expansion
+    import math
+    capacity_bps = B * math.log2(1 + snr_linear)
+    spectral_efficiency = capacity_bps / B
+    
+    return snr_db, capacity_bps / 1e6, spectral_efficiency
+# --- 1. SESSION STATE FOR THE FAILOVER ---
+if "fiber_cut" not in st.session_state:
+    st.session_state.fiber_cut = False
+
+# --- 2. STRESS TEST CONTROLLER ---
+st.sidebar.divider()
+st.sidebar.subheader("🚨 Disaster Recovery Testing")
+if st.sidebar.button("💥 Simulate Mombasa Fiber Cut"):
+    st.session_state.fiber_cut = not st.session_state.fiber_cut
+
+# --- 3. UPDATED LOGIC FOR THE MAP & SHANNON ---
+if st.session_state.fiber_cut:
+    st.error("⚠️ CRITICAL: Submarine Cable Severed in Mombasa!")
+    # Physically reroute load to Nairobi & terrestrial backups
+    df.loc[df['City'] == 'Mombasa (KIXP)', 'Load %'] = 100
+    df.loc[df['City'] == 'Nairobi (KIXP)', 'Load %'] += 40 # Influx of rerouted traffic
+    reroute_path = [[-4.04, 39.6], [-3.39, 38.5], [-1.28, 36.8]] # Mombasa -> Voi -> Nairobi
+else:
+    reroute_path = []
+
+# --- 4. EXPANDED SHANNON-HARTLEY (The Math in Motion) ---
+def get_shannon_deep_dive(B_mhz, S_watts, N_watts):
+    """
+    Decomposes the Shannon-Hartley Theorem into its constituent parts:
+    B (Bandwidth), S (Signal Power), N (Noise Power)
+    """
+    B = B_mhz * 1e6
+    SNR_linear = S_watts / N_watts
+    # Capacity in bits per second
+    C = B * math.log2(1 + SNR_linear)
+    
+    # Hidden Truth: Energy per Bit (Eb/No)
+    # This shows the engineering efficiency of the transmission
+    Eb_No = SNR_linear * (B / C)
+    
+    return C / 1e6, math.log2(1 + SNR_linear), Eb_No
+
+# Example UI implementation of the deep dive
+st.subheader("📡 Advanced Link Physics")
+# Assume S = 0.5 Watts, N = 0.0001 Watts for standard fiber
+cap, spec_eff, eb_no = get_shannon_deep_dive(20, 0.5, 0.0005 if st.session_state.fiber_cut else 0.0001)
+
+st.write(f"**Current Spectral Efficiency:** `{round(spec_eff, 3)}` bits/sec/Hz")
+st.progress(spec_eff / 10 if spec_eff < 10 else 1.0) 
+st.caption("This bar shows how close we are to the 'Shannon Limit'. If it's full, the physics of the cable cannot carry more data without better hardware.")
 
 
 # Auto-Refresh
