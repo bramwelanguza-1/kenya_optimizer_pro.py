@@ -1,0 +1,10 @@
+{
+   "deploy": {
+    "startCommand": "streamlit run kenya_optimizer_pro.py --server.address 0.0.0.0 --server.port $PORT",
+    "restartPolicyType": "ON_FAILURE"
+  }
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+}
