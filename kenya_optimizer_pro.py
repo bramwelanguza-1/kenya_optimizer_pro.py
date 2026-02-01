@@ -3,87 +3,109 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 import math
+import datetime
 import random
 import matplotlib.pyplot as plt
-from streamlit_autorefresh import st_autorefresh
 
-# --- 1. CONFIG & STABLE STATE ---
-st.set_page_config(layout="wide", page_title="KenyaNet Stable NOC")
+# --- 1. CONFIG & SESSION STATE ---
+st.set_page_config(layout="wide", page_title="KenyaNet NOC Pro")
 
-# Set refresh to 10,000ms (10 seconds)
-count = st_autorefresh(interval=10000, limit=1000, key="stable_tick")
+# Initialize logs and state if they don't exist
+if "logs" not in st.session_state:
+    st.session_state.logs = []
+if "fiber_cut" not in st.session_state:
+    st.session_state.fiber_cut = False
+if "optimize" not in st.session_state:
+    st.session_state.optimize = False
 
-if "fiber_cut" not in st.session_state: st.session_state.fiber_cut = False
-if "optimize" not in st.session_state: st.session_state.optimize = False
+# --- 2. DYNAMIC DATA GENERATION ---
+def get_current_data():
+    base_data = {
+        'City': ['Nairobi', 'Mombasa', 'Kisumu', 'Eldoret'],
+        'Lat': [-1.286, -4.043, -0.091, 0.514], 'Lon': [36.817, 39.668, 34.767, 35.269],
+        'Load %': [65, 55, 42, 38]
+    }
+    df = pd.DataFrame(base_data)
+    
+    # Add random jitter (+/- 2%)
+    df['Load %'] = df['Load %'] + [random.randint(-2, 2) for _ in range(4)]
+    
+    if st.session_state.fiber_cut:
+        df.loc[df['City'] == 'Mombasa', 'Load %'] = 98
+        df.loc[df['City'] == 'Nairobi', 'Load %'] += 20
+        
+    if st.session_state.optimize:
+        df['Load %'] = df['Load %'] * 0.7
+        
+    return df
 
-# --- 2. DATA GENERATION ---
-data = {
-    'City': ['Nairobi (KIXP)', 'Mombasa (KIXP)', 'Kisumu (KIXP)', 'Eldoret (KIXP)'],
-    'Lat': [-1.286, -4.043, -0.091, 0.514], 'Lon': [36.817, 39.668, 34.767, 35.269],
-    'Base Load': [65, 55, 40, 35]
-}
-df = pd.DataFrame(data)
-# Dynamic drift for values
-df['Load %'] = df['Base Load'] + [random.randint(-3, 3) for _ in range(4)]
-
-if st.session_state.fiber_cut:
-    df.loc[df['City'] == 'Mombasa (KIXP)', 'Load %'] = 98
-    df.loc[df['City'] == 'Nairobi (KIXP)', 'Load %'] += 20
-
-if st.session_state.optimize:
-    df['Load %'] = df['Load %'] * 0.7
-
-# --- 3. UI LAYOUT ---
-st.title(f"📡 Stable Network Monitor | Refreshing in 10s (Tick: {count})")
-
-col_left, col_right = st.columns([2, 1])
-
-with col_left:
-    # THE MAP (Now with a static key so it doesn't flicker)
+# --- 3. THE STATIC MAP (No Flicker) ---
+def render_stable_map(df):
     m = folium.Map(location=[-1.28, 36.8], zoom_start=6, tiles="CartoDB dark_matter")
     for _, r in df.iterrows():
-        # Signal logic: Red for danger, Yellow for high load, Green for OK
-        status_color = 'red' if r['Load %'] > 90 else 'yellow' if r['Load %'] > 70 else 'green'
-        folium.CircleMarker(
-            location=[r['Lat'], r['Lon']],
-            radius=12,
-            color=status_color,
-            fill=True,
-            fill_opacity=0.7,
-            popup=f"{r['City']}: {round(r['Load %'], 1)}%"
-        ).add_to(m)
+        color = 'red' if r['Load %'] > 90 else 'yellow' if r['Load %'] > 75 else 'green'
+        folium.CircleMarker([r['Lat'], r['Lon']], radius=15, color=color, fill=True).add_to(m)
+    return st_folium(m, width=800, height=450, key="noc_map_fixed")
+
+# --- 4. THE LIVE FRAGMENT (Updates every 10s) ---
+@st.fragment(run_every="10s")
+def live_dashboard_fragment():
+    df = get_current_data()
     
-    # We use a fixed key to prevent the "disappearing/reappearing" effect
-    st_folium(m, width=800, height=450, key="static_kenya_map")
+    col_stats, col_logs = st.columns([1, 1])
+    
+    with col_stats:
+        st.subheader("📊 Live Metrics (10s interval)")
+        target_load = df['Load %'].max()
+        # Shannon-Hartley Calculation
+        B = 20 
+        SNR = 35 - (target_load / 3)
+        Capacity = B * math.log2(1 + 10**(SNR/10))
+        
+        st.metric("Peak System Load", f"{round(target_load, 1)}%")
+        st.metric("Effective Capacity", f"{round(Capacity, 1)} Mbps", delta=f"{round(SNR, 1)} dB SNR")
+        
+        # Mini chart
+        fig, ax = plt.subplots(figsize=(6, 2))
+        ax.bar(df['City'], df['Load %'], color=['red' if x > 85 else 'green' for x in df['Load %']])
+        ax.set_ylim(0, 105)
+        st.pyplot(fig)
 
-    # Bar Chart updating below
-    st.subheader("📊 Real-Time Signal Levels")
-    fig, ax = plt.subplots(figsize=(10, 2.5))
-    ax.bar(df['City'], df['Load %'], color=['red' if x > 85 else 'yellow' if x > 70 else 'green' for x in df['Load %']])
-    ax.set_ylim(0, 100)
-    st.pyplot(fig)
+    with col_logs:
+        st.subheader("📜 System Incident Log")
+        # Display the log as a clean table
+        if st.session_state.logs:
+            log_df = pd.DataFrame(st.session_state.logs).iloc[::-1] # Show newest first
+            st.table(log_df.head(5))
+        else:
+            st.info("No incidents recorded in current session.")
 
-with col_right:
-    st.subheader("🕹️ Mitigation Control")
-    st.button("🚨 Simulate Fiber Cut", on_click=lambda: st.session_state.update({"fiber_cut": not st.session_state.fiber_cut}))
-    st.button("🚀 AI Optimization", on_click=lambda: st.session_state.update({"optimize": not st.session_state.optimize}))
+# --- 5. MAIN UI ---
+st.title("🇰🇪 Kenya National Network Operations Center")
+
+c_left, c_right = st.columns([2, 1])
+
+with c_left:
+    # Map stays steady here
+    render_stable_map(get_current_data())
+    # This part "ticks" every 10s without refreshing the map!
+    live_dashboard_fragment()
+
+with c_right:
+    st.subheader("🛠️ Control Center")
+    
+    if st.button("🚨 Toggle Fiber Cut"):
+        st.session_state.fiber_cut = not st.session_state.fiber_cut
+        status = "CRITICAL: Fiber Cut" if st.session_state.fiber_cut else "RESOLVED: Link Restored"
+        st.session_state.logs.append({"Timestamp": datetime.datetime.now().strftime("%H:%M:%S"), "Event": status})
+        st.rerun()
+
+    if st.button("🚀 Apply AI Mitigation"):
+        st.session_state.optimize = not st.session_state.optimize
+        status = "MITIGATION: Active" if st.session_state.optimize else "MITIGATION: Offline"
+        st.session_state.logs.append({"Timestamp": datetime.datetime.now().strftime("%H:%M:%S"), "Event": status})
+        st.rerun()
 
     st.divider()
-    
-    # SHANNON-HARTLEY THEOREM (Updating Values)
-    st.subheader("🧬 Shannon-Hartley Analysis")
-    target = df.iloc[df['Load %'].idxmax()]
-    B = 20 # MHz
-    SNR_db = 35 - (target['Load %'] / 3)
-    Capacity = B * math.log2(1 + 10**(SNR_db/10))
-    
-    st.latex(r"C = B \log_2(1 + SNR)")
-    st.metric("Link Capacity", f"{round(Capacity, 1)} Mbps", delta=f"{round(SNR_db, 1)} dB SNR")
-    
-    # MITIGATION STATUS
-    if st.session_state.fiber_cut:
-        st.error(f"CRITICAL: Fiber Cut at {target['City']}! Capacity drop detected.")
-    elif st.session_state.optimize:
-        st.success("MITIGATION ACTIVE: Spectral Efficiency maximized.")
-    else:
-        st.info("System Nominal: Signals within operating parameters.")
+    st.latex(r"C = B \log_2(1 + \frac{S}{N})")
+    st.caption("Theoretical limit monitoring based on current SNR.")
