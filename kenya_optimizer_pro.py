@@ -11,7 +11,7 @@ from streamlit_autorefresh import st_autorefresh # NEW: Add this to requirements
 st.set_page_config(layout="wide", page_title="KenyaNet NOC - Live")
 
 # This "pings" the app every 3000ms (3 seconds) to simulate live data flow
-count = st_autorefresh(interval=3000, limit=100, key="network_tick")
+count = st_autorefresh(interval=10000, limit=100, key="network_tick")
 
 # --- 2. PERSISTENT STATE ---
 if "fiber_cut" not in st.session_state: st.session_state.fiber_cut = False
