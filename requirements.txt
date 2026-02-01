@@ -3,3 +3,4 @@ pandas
 folium==0.15.1
 streamlit-folium==0.18.0
 matplotlib
+streamlit-autorefresh
