@@ -1,4 +1,4 @@
-streamlit
+streamlit>=1.33.0
 pandas
 folium==0.15.1
 streamlit-folium==0.18.0
