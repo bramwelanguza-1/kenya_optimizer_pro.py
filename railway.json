@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "sh -c "streamlit run kenya_optimizer_pro.py --server.port $PORT --server.address 0.0.0.0",
+    "startCommand": "sh -c 'streamlit run kenya_optimizer_pro.py --server.port $PORT --server.address 0.0.0.0'",
     "restartPolicyType": "ON_FAILURE"
   }
 }
