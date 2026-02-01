@@ -1,7 +1,10 @@
 [server]
 headless = true
-port = 8080
+port = 8501
 address = "0.0.0.0"
 enableCORS = false
 enableXsrfProtection = false
-enableWebsocketCompression = false # Important for TCP Proxies
+enableWebsocketCompression = false
+
+[browser]
+gatherUsageStats = false
